@@ -1,5 +1,8 @@
 # Training Notes & Lessons Learned
 
+*Carried over from the upstream lgpearson1771/openwakeword-trainer fork (MIT
+License — see `NOTICE.md`); not specific to the Intel Arc/xpu port.*
+
 Technical notes from building and debugging the openWakeWord training pipeline. Useful if you're troubleshooting issues or want to understand why certain design decisions were made.
 
 ## torchaudio 2.10+ Breaking Changes

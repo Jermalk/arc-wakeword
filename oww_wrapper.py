@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """oww_wrapper.py — Run the vendored ``oww_train_xpu`` with compat patches.
 
+Adapted from the lgpearson1771/openwakeword-trainer fork (MIT License, Copyright
+(c) 2026 Luke Pearson — see NOTICE.md and third_party_licenses/).
+
 This wrapper applies monkey-patches for torchaudio 2.10+, speechbrain, and
 piper-sample-generator BEFORE openwakeword is imported, then delegates to
 ``oww_train_xpu`` — this project's device-portable (xpu > cuda > cpu) copy of

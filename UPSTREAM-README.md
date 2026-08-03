@@ -1,3 +1,11 @@
+> **This is the upstream fork's original README, kept verbatim for attribution and
+> context — see `NOTICE.md`.** It predates this repo's CUDA→XPU port and describes
+> the *original* pipeline: NVIDIA/CUDA required, WSL2 assumed, and it references
+> `train.sh`, which does not exist in this repo. **It is not instructions for this
+> repo** — use the top-level `README.md` instead. Its "License: MIT — see LICENSE"
+> line (bottom of this file) refers to *its own* original repository's license, not
+> this repo's `LICENSE` (Apache-2.0) — see `NOTICE.md` for how the two relate.
+
 # openwakeword-trainer
 
 Train custom wake word models with [openWakeWord](https://github.com/dscripka/openWakeWord). A granular 13-step pipeline with compatibility patches for torchaudio 2.10+, Piper TTS, and speechbrain. Generates tiny ONNX models (~200 KB) for real-time keyword detection — like building your own "Hey Siri" trigger.

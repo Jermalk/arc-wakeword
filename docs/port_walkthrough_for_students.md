@@ -218,7 +218,8 @@ problems from Step 5 simply don't exist there). Those numbers are the next chapt
 4. **Monkeypatching is a loan.** You can lie to old code to make it run, but you must
    track every place the lie leaks, and keep the truth around to restore.
 5. **On new hardware, verify the arithmetic itself.** The scariest bug computed wrong
-   answers without crashing. A ten-line sanity script now guards every machine we use.
+   answers without crashing. A short, standalone sanity script (`check_xpu_sanity.py`)
+   now gets run by hand on every new machine before trusting anything else.
 6. **Portability is a public good.** The fix wasn't heroic — resolve the device in one
    place, add one branch. The barrier was never technical difficulty; it was that
    nobody with non-NVIDIA hardware had walked through first and written it down.

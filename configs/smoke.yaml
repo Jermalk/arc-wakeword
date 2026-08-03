@@ -1,7 +1,9 @@
 # Smoke-test config — tiny end-to-end pipeline run, NOT a usable model.
 # Purpose: prove the vendored pipeline runs unmodified (CPU baseline), then
 # re-run identically on xpu to validate the CUDA→XPU port. Timings from this
-# config are the CPU-vs-iGPU-vs-B70 comparison points.
+# config are the CPU-vs-iGPU comparison points in docs/port_walkthrough.md.
+# NOTE: this still triggers the pipeline's full ~15 GB dataset download on
+# first run regardless of the tiny sample/step counts — see README.md.
 #
 # Derived from configs/hey_echo.yaml; only sizes reduced.
 

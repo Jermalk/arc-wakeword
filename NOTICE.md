@@ -2,8 +2,9 @@
 
 This repository is licensed under the Apache License, Version 2.0 (see `LICENSE`)
 for its own original contributions — the Intel Arc/`xpu` port itself (`device.py`,
-the XPU-specific portions of `compat.py`, `check_xpu_sanity.py`, and this project's
-documentation). It also incorporates modified code from two upstream projects,
+the XPU-specific portions of `compat.py`, `check_xpu_sanity.py`, and the README/
+`docs/port_walkthrough*.md`/`docs/xpu_nonzero_bug.md` documentation of that port).
+It also incorporates modified or unmodified code and text from upstream projects,
 credited here per each project's own license terms.
 
 ## openWakeWord (Apache License 2.0)
@@ -21,12 +22,13 @@ license text is needed here beyond this attribution.
 **Copyright (c) 2026 Luke Pearson.** https://github.com/lgpearson1771/openwakeword-trainer
 
 `train_wakeword.py`, `oww_wrapper.py`, the original (non-XPU) portions of
-`compat.py`, and the `configs/hey_echo.yaml`/`configs/smoke.yaml` structure are
-adapted from this fork, which modernized openWakeWord's training pipeline for
-current `torchaudio`/Piper TTS/`speechbrain` before this project retargeted its
-device handling to Intel Arc. Full MIT license text preserved at
-`third_party_licenses/LICENSE-openwakeword-trainer-MIT.txt`, per that license's
-own terms.
+`compat.py`, the `configs/hey_echo.yaml`/`configs/smoke.yaml` structure,
+`docs/training_notes.md`, and `UPSTREAM-README.md` (kept verbatim, see the banner
+at its top) are adapted or copied from this fork, which modernized openWakeWord's
+training pipeline for current `torchaudio`/Piper TTS/`speechbrain` before this
+project retargeted its device handling to Intel Arc. Full MIT license text
+preserved at `third_party_licenses/LICENSE-openwakeword-trainer-MIT.txt`, per that
+license's own terms.
 
 ## Piper / piper-sample-generator
 

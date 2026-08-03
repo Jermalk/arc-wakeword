@@ -2,8 +2,8 @@
 
 The whole point of this project is that no code path may hardcode "cuda":
 resolve the device ONCE here and thread it through. Preference order is
-xpu > cuda > cpu so the same code runs on Intel Arc, on the upstream
-project's NVIDIA boxes, and on anything else, without edits.
+xpu > cuda > cpu so the same code runs on Intel Arc, on an NVIDIA box (the
+upstream pipeline's original target), and on CPU-only machines, unmodified.
 """
 
 from __future__ import annotations

@@ -2,6 +2,11 @@
 """
 train_wakeword.py — Granular custom wake word training pipeline.
 
+Adapted from the lgpearson1771/openwakeword-trainer fork (MIT License, Copyright
+(c) 2026 Luke Pearson — see NOTICE.md and third_party_licenses/), with device
+handling retargeted from a hardcoded CUDA assumption to device.py's resolved-once
+xpu > cuda > cpu device.
+
 Each stage has a **do** step and a **verify** step so problems surface
 immediately instead of cascading.  You can run the full pipeline, resume
 from any step, or run a single step in isolation.
@@ -14,8 +19,9 @@ Usage:
     python train_wakeword.py --verify-only                    # check state
     python train_wakeword.py --list-steps                     # show steps
 
-Run inside WSL2 with CUDA support.
-See README.md for full setup instructions.
+Runs on Linux with an xpu (Intel Arc), cuda (NVIDIA), or cpu-only PyTorch device —
+resolved once via device.py, never hardcoded. See README.md for full setup
+instructions.
 """
 
 from __future__ import annotations
@@ -137,7 +143,7 @@ def _clone_repo(url: str, dest: Path) -> None:
 # ── 1. check-env ──────────────────────────────────────────────────────────
 
 def step_check_env() -> bool:
-    """Verify Python ≥3.10, CUDA availability, and critical imports."""
+    """Verify Python >=3.10, resolve the accelerator device, and check critical imports."""
     ok = True
 
     # Python version
@@ -151,21 +157,15 @@ def step_check_env() -> bool:
     import platform
     log.info("  Platform: %s", platform.platform())
     if platform.system() != "Linux":
-        log.error("  This script must run inside WSL2 (Linux)")
+        log.error("  This pipeline requires Linux (piper-phonemize has no non-Linux wheels)")
         ok = False
 
-    # Accelerator (XPU preferred — this project's whole point — then CUDA)
+    # Accelerator — single point of resolution, see device.py (xpu > cuda > cpu)
     try:
-        import torch
-        if torch.xpu.is_available():
-            gpu = torch.xpu.get_device_name(0)
-            mem = torch.xpu.get_device_properties(0).total_memory / (1 << 30)
-            log.info("  XPU:  %s  (%.1f GB)", gpu, mem)
-        elif torch.cuda.is_available():
-            gpu = torch.cuda.get_device_name(0)
-            mem = torch.cuda.get_device_properties(0).total_memory / (1 << 30)
-            log.info("  CUDA: %s  (%.1f GB)", gpu, mem)
-        else:
+        import device as device_module
+        resolved = device_module.resolve_device()
+        log.info("  Device: %s", device_module.describe(resolved))
+        if resolved == "cpu":
             log.warning("  No XPU or CUDA — training will be very slow on CPU")
     except ImportError:
         log.error("  PyTorch not installed")
@@ -236,7 +236,7 @@ def step_download() -> bool:
     _download(
         URLS["piper_model"],
         piper_models_dir / "en_US-libritts_r-medium.pt",
-        "Piper LibriTTS model (~800 MB)",
+        "Piper LibriTTS model (~204 MB)",
     )
 
     # 3c — ACAV100M pre-computed negative features
@@ -391,7 +391,9 @@ def step_generate() -> bool:
         return False
 
     log.info("  Generating clips via openwakeword + Piper TTS …")
-    log.info("  (Longest step — ~10 min on GPU, hours on CPU)")
+    log.info("  (Longest step at full scale/batch size — hours on CPU. At tiny")
+    log.info("   batch sizes like the smoke config's, generation is host-bound")
+    log.info("   and can be SLOWER on GPU — see docs/port_walkthrough.md §6.)")
 
     try:
         _run([
@@ -827,7 +829,7 @@ def _generate_synthetic_noise(dest: Path, n: int = 200, label: str = "noise") ->
 # ═══════════════════════════════════════════════════════════════════════════
 
 STEPS: list[tuple[str, Callable[[], bool], str]] = [
-    ("check-env",        step_check_env,        "Verify Python ≥3.10, CUDA, critical imports"),
+    ("check-env",        step_check_env,        "Verify Python ≥3.10, resolve device, critical imports"),
     ("apply-patches",    step_apply_patches,     "Apply torchaudio/speechbrain/piper compat patches"),
     ("download",         step_download,          "Download datasets, Piper TTS model, tools"),
     ("verify-data",      step_verify_data,       "Check all data files present & minimum sizes"),
@@ -970,7 +972,12 @@ def main() -> None:
             yamls = sorted(configs_dir.glob("*.yaml"))
             if yamls:
                 CONFIG_FILE = yamls[0]
-                log.info("Using config: %s", CONFIG_FILE)
+                log.warning(
+                    "No --config given and %s not found — falling back to the "
+                    "alphabetically first config in configs/: %s. Pass --config "
+                    "explicitly to avoid relying on this.",
+                    DEFAULT_CONFIG, CONFIG_FILE,
+                )
 
     ok = run_pipeline(
         from_step=args.from_step,

@@ -36,13 +36,14 @@ model+inputs moved to xpu via the shim.
 ## Findings
 
 - (2026-07-11 18:31) Crash reproduced on first run; 0 clips generated. Not intermittent.
-- (18:35) Stage-bisect (scratchpad/repro_xpu_indexing.py): CPU control passes all stages;
+- (18:35) Stage-bisect (a throwaway repro script, run stage-by-stage with
+  `torch.xpu.synchronize()` after each): CPU control passes all stages;
   XPU dies inside `model.dp` (stochastic duration predictor, reverse) →
   `piper_train/vits/transforms.py:75` `outputs[outside_interval_mask] = inputs[outside_interval_mask]`
   → `RuntimeError: numel: integer multiplication overflow` (sync) / device assert (async).
 - (18:40) H1 eliminated: phoneme ids max 120 < vocab 256; same data passes on CPU.
 - (18:45) Instrumented spy at the spline: inputs (1,1,23) gapped view (stride 46,23,1),
-  widths/heights/derivs non-contiguous. Saved tensors to scratchpad/spline_args.pt.
+  widths/heights/derivs non-contiguous. Tensors saved off for isolated repro.
 - (18:50) **ROOT CAUSE — H2 confirmed, and it's worse than an indexing edge case:
   `torch.nonzero()` itself returns wrong results on this stack.** Evidence:
   - `torch.tensor([1,0,1,0,1], device='xpu').nonzero()` → `[0,0,4]` (expect `[0,2,4]`). Deterministic.
@@ -54,8 +55,9 @@ model+inputs moved to xpu via the shim.
   - All masked indexing (`t[mask]`, `masked_select`, index_put via mask) uses nonzero
     internally → piper's spline transform is collateral damage.
 - Environment: torch 2.13.0+xpu, intel-opencl-icd 26.05.37020.3, kernel 7.0.0-27,
-  LNL iGPU (Arc 130V/140V). NOTE: may be specific to this driver/GPU combo — B70 box
-  must re-run scratchpad/repro grid before trusting any XPU result.
+  LNL iGPU (Arc 130V/140V-class). NOTE: may be specific to this driver/GPU combo —
+  flagged to re-run this same repro grid on the Arc Pro B70 before trusting any XPU
+  result there. **Update:** subsequently re-run and confirmed clean on the B70.
 
 ## Resolution
 
@@ -67,9 +69,11 @@ model+inputs moved to xpu via the shim.
   pytorch#170166 (count_nonzero XPU crash regression, ~2.10 nightlies), pytorch#146883
   (aten.nonzero layout deviation), intel/torch-xpu-ops#1506 (BMG/LNL accuracy fails).
   None is an exact match — candidate for an upstream bug report.
-- **Fix applied: project pinned to torch==2.9.1+xpu + torchaudio==2.9.1+xpu** (the only
-  coherent pair below 2.13 on the xpu index — torchaudio skipped 2.10, and 2.11.0
-  requires torch 2.13.0 exactly, so torch 2.12.x has no torchaudio at all).
+- **Fix applied: project pinned to torch==2.9.1+xpu + torchaudio==2.9.1+xpu** — the
+  exact pair confirmed clean by the bisection above. Not re-tested: whether later
+  torchaudio/torch xpu releases (2.10+) also carry this regression — the nearest
+  public issue (pytorch#170166) reports it starting around the 2.10 nightlies, which
+  is reason enough to stay on the confirmed-good pair rather than assume newer is fine.
 - Permanent guard: `check_xpu_sanity.py` — run on every new box/driver/torch combo
   before trusting any XPU result. PASSES on this stack.
 
@@ -84,4 +88,5 @@ tracer — upstream's opset-13 export was written for it anyway).
 Lesson: a lying `is_available()` is a loaded gun for any torch-internal feature gate;
 scope the lie tightly.
 
-## Status: RESOLVED (2026-07-11) — pipeline unblocked, XPU smoke rerun pending.
+## Status: RESOLVED (2026-07-11) — pipeline unblocked, XPU smoke rerun passed.
+Subsequently reconfirmed clean on the Arc Pro B70 target hardware.

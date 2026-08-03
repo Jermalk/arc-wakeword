@@ -1,8 +1,7 @@
-# Article material — porting openWakeWord training from NVIDIA CUDA to Intel Arc
+# Porting openWakeWord training from NVIDIA CUDA to Intel Arc
 
-Raw material for the article, written 2026-07-11 while it happened. Companion to
-`20260711_beats.md` (story beats/reactions) — this is the technical narrative:
-every step of the port, in order, with the actual code.
+Written 2026-07-11 while the port happened. The technical narrative: every step of
+the port, in order, with the actual code.
 
 ---
 
@@ -18,7 +17,7 @@ Meanwhile PyTorch has shipped a native Intel GPU backend (`torch.xpu`, upstreame
 2.5, with Intel's IPEX bridge sunset in its favor). Nobody had connected the two.
 
 Target: train on an Intel Arc Pro B70 (32 GB, Battlemage). Development/validation: a
-Lunar Lake laptop iGPU (Arc 140V class, Xe2 — same architecture family, tiny). That
+Lunar Lake laptop iGPU (Arc 130V/140V-class, Xe2 — same architecture family, tiny). That
 choice paid off: the *entire port* was provable on a laptop before the workstation ever
 entered the picture — same `xpu` device string, same driver stack, different silicon.
 
@@ -74,9 +73,8 @@ audit as a unit, shim what you'd otherwise have to fork.**
 
 ### 4a. Resolve the device once
 
-The core discipline (it's a hard rule in this repo's CLAUDE.md): no code path may
-hardcode `"cuda"` — or `"xpu"`, for that matter. One function decides, everything else
-threads it through:
+The core discipline of this port: no code path may hardcode `"cuda"` — or `"xpu"`,
+for that matter. One function decides, everything else threads it through:
 
 ```python
 # device.py
@@ -207,9 +205,9 @@ without pip; scipy 1.17 removing `sph_harm` (used by the `acoustics` dep); piper
 refactoring away the top-level module openwakeword imports (`sys.modules` shim);
 datasets 4.x killing the MIT-RIR script-dataset (rewritten to `snapshot_download` of
 the plain WAVs); openwakeword's base feature models not being bundled in the pip
-package; and a stale size check (expects ≥600 MB for a 204 MB model). Full details in
-DECISIONS.md. Article framing: **the CUDA pin is one axis of bitrot; this stack decays
-on every axis simultaneously. Reproducibility work IS the port work.**
+package; and a stale size check (expects ≥600 MB for a 204 MB model). Framing: **the
+CUDA pin is one axis of bitrot; this stack decays on every axis simultaneously.
+Reproducibility work IS the port work.**
 
 ### 5b. The centerpiece: the wheel whose `nonzero` lies
 
@@ -238,11 +236,12 @@ The diagnosis method is the reusable part:
    a 23-element tensor** (the source of the OOB asserts). Every masked-indexing op in
    torch funnels through `nonzero`. Nothing in a loss curve would ever tell you.
 5. **Version bisect on the same driver.** 2.13.0+xpu broken, 2.12.1+xpu correct,
-   2.9.1+xpu correct → wheel regression, not driver. Pinned 2.9.1 (the only version
-   below 2.13 with a matching torchaudio on the xpu index — torchaudio skipped 2.10,
-   and 2.11.0 hard-requires torch 2.13.0).
-6. **Institutionalize the check.** `check_xpu_sanity.py` now gates every new
-   machine/driver/torch combo — it must pass on the B70 before anything trains there.
+   2.9.1+xpu correct → wheel regression, not driver. Pinned to the confirmed-clean
+   2.9.1 pair rather than assuming a newer release is fine — the nearest public issue
+   (pytorch#170166) reports the regression starting around the 2.10 nightlies.
+6. **Institutionalize the check.** `check_xpu_sanity.py` — run it on every new
+   machine/driver/torch combo before trusting any XPU result there. It was rerun and
+   passed on the Arc Pro B70 target hardware before any real training happened on it.
 
 Pull-quote: **"should work the same" is exactly the assumption this project exists to
 test — and the failure mode isn't a crash, it's silently wrong arithmetic.**
@@ -261,18 +260,23 @@ Two memory incidents unique to integrated GPUs (the B70's dedicated VRAM has nei
 
 ## 6. The numbers (smoke config: 500 steps, 800 TTS clips)
 
-| Step | CPU (laptop, 8 cores) | LNL iGPU (Arc 140V) | Notes |
+| Step | CPU (laptop, 8 cores) | LNL iGPU (Arc 130V/140V-class) | Notes |
 |---|---|---|---|
 | TTS generation (800 clips) | ~2.5 min | ~10 min | iGPU loses: batch 10, host-bound |
 | Augment + features | ~1.5 min | ~1.3 min | ORT CPU either way (by design) |
 | Train step (all 3 sequences) | 8m24s | 11m07s | see below |
 | — pure training loop | ~1 it/s | **38–45 it/s** | **~40× on XPU** |
-| Extrapolated full run (50k steps) | ~14 h | ~1–1.5 h | loop dominates at scale |
+| Training loop alone, extrapolated to 50k steps | ~13.9 h | ~18–22 min | per-step rate only — excludes generate/augment, which don't scale the same way |
 | Upstream README reference | 12–24 h CPU | — | "1–2 h" on NVIDIA GPU |
 
 The honest headline: at *smoke* scale the iGPU loses end-to-end (validation passes are
-tiny-batch, transfer-bound). At *real* scale the training loop dominates and the ~40×
-loop speedup wins. And this is the wrong Arc — the B70 numbers get their own column.
+tiny-batch, transfer-bound). At *real* scale the training loop dominates the wall-clock
+and the ~40× loop speedup wins out. This table is the laptop iGPU only; the same code
+was subsequently used for a full-scale production training run on the actual target
+hardware, an Intel Arc Pro B70 (32 GB, Battlemage) — not re-tabulated here since that
+run's specifics belong to the downstream project it trained a model for, but the port
+and its diagnostic tooling (this section, and `check_xpu_sanity.py`) are exactly what
+was validated on it first.
 
 ## 7. CUDA → XPU cheat sheet (as actually used)
 
@@ -293,9 +297,11 @@ loop speedup wins. And this is the wrong Arc — the B70 numbers get their own c
    guarded so NVIDIA/CPU environments are untouched.
 3. **A lying `is_available()` must be scoped** — torch internals also ask.
 4. **Validate kernels, not just pipelines** — a sanity script for primitive ops
-  (`nonzero`, masked indexing) is now a permanent gate before any new stack trains.
+  (`nonzero`, masked indexing), meant to be run by hand before trusting any new
+  machine/driver/torch combination.
 5. **Baseline on CPU first, unmodified** — every later failure was attributable in
    minutes because the un-ported pipeline was known-good.
-6. **The portability work and the reproducibility work are the same work.** Six of the
-   eight fixes had nothing to do with CUDA. The pin was just the loudest symptom of an
-   unmaintained stack.
+6. **The portability work and the reproducibility work are the same work.** The six
+   ecosystem-drift fixes in §5a had nothing to do with CUDA at all — on top of
+   everything CUDA-specific in §4. The CUDA pin was just the loudest symptom of a
+   stack decaying on every axis at once, not the only one.

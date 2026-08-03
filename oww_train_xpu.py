@@ -30,7 +30,9 @@ from openwakeword.utils import compute_features_from_generator
 from openwakeword.utils import AudioFeatures
 
 # Device resolved ONCE for the whole training flow (xpu > cuda > cpu) — the
-# core discipline of this port: no torch.cuda.* call sites below this line.
+# core discipline of this port. The one deliberate exception is
+# _unshimmed_cuda() below, which reads torch.cuda.is_available() on purpose
+# to work around a compat.py shim side effect during ONNX export.
 from device import resolve_device, empty_cache
 
 TRAIN_DEVICE = resolve_device()

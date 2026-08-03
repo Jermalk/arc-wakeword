@@ -1,5 +1,10 @@
 """compat.py — Compatibility patches for openWakeWord training dependencies.
 
+Adapted from the lgpearson1771/openwakeword-trainer fork (MIT License, Copyright
+(c) 2026 Luke Pearson — see NOTICE.md and third_party_licenses/). The cuda->xpu
+shim (_patch_cuda_to_xpu_shim and related) is this project's own addition on top
+of that fork's original compat-patch layer.
+
 Addresses known breaking changes in modern dependency versions:
   - setuptools 82+ removed pkg_resources
   - torchaudio 2.10+ removed load(), info(), list_audio_backends()

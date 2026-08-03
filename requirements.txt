@@ -1,0 +1,52 @@
+# Training-only dependencies for openWakeWord custom model training.
+# Install inside WSL2 / Linux:
+#   pip install -r requirements.txt
+
+# --- Core training ---
+# torch/torchaudio: install from the XPU index —
+#   pip install torch==2.9.1+xpu torchaudio==2.9.1+xpu --index-url https://download.pytorch.org/whl/xpu
+# Pinned because torch 2.13.0+xpu ships a broken nonzero kernel (wrong masked-
+# indexing results on LNL iGPU) — see docs/xpu_nonzero_bug.md and run
+# check_xpu_sanity.py before changing these pins.
+openwakeword==0.6.0
+torch==2.9.1+xpu
+torchaudio==2.9.1+xpu
+torchinfo>=1.8
+torchmetrics>=1.2
+speechbrain>=0.5.14
+
+# --- Audio augmentation ---
+audiomentations>=0.33
+torch-audiomentations>=0.11
+acoustics>=0.2.6
+
+# --- TTS & phonemics ---
+piper-phonemize>=1.1.0
+pronouncing>=0.2.0
+deep-phonemizer>=0.0.19
+
+# --- Data & utilities ---
+# datasets: kept for anything upstream still importing it, but background-noise
+# download (AudioSet/FMA) no longer uses load_dataset() — see huggingface_hub/
+# pyarrow/remotezip below instead.
+datasets>=2.14
+huggingface_hub>=0.25   # direct parquet/file fetch for AudioSet/FMA (bypasses load_dataset)
+pyarrow>=17             # reads AudioSet parquet shards directly
+remotezip>=0.12          # ranged reads into fma_small.zip — avoids the full 7.3 GB download
+mutagen>=1.47
+webrtcvad>=2.0.10
+scipy<1.17          # 1.17 removed scipy.special.sph_harm, still imported by acoustics
+numpy
+pip                  # uv venvs omit pip; step_download shells out to `python -m pip`
+pyyaml
+tqdm
+requests
+
+# --- Compat patches ---
+# setuptools<82 keeps pkg_resources (removed in 82+)
+# soundfile is the fallback backend for patched torchaudio 2.10+
+setuptools<82
+soundfile
+onnxruntime          # for verify-model step
+onnx                 # for ONNX export from PyTorch
+onnxscript           # required by torch.onnx.export in PyTorch 2.x

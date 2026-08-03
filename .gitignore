@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Model artifacts and training outputs — large, regenerable, don't commit
+*.onnx
+*.onnx.data
+*.xml
+*.bin
+*.npy
+data/
+output/
+export/
+models/

@@ -1,0 +1,63 @@
+# Smoke-test config — tiny end-to-end pipeline run, NOT a usable model.
+# Purpose: prove the vendored pipeline runs unmodified (CPU baseline), then
+# re-run identically on xpu to validate the CUDA→XPU port. Timings from this
+# config are the CPU-vs-iGPU-vs-B70 comparison points.
+#
+# Derived from configs/hey_echo.yaml; only sizes reduced.
+
+# ── Model identity ──
+model_name: "smoke_hey_echo"
+
+# ── Target phrase(s) ──
+target_phrase:
+  - "hey echo"
+
+# ── Explicit negatives ──
+custom_negative_phrases:
+  - "hey gecko"
+  - "hey deco"
+  - "echo"
+  - "hey"
+
+# ── Sample generation ── (tiny: smoke only)
+n_samples: 300             # positive training clips (full run: 50000)
+n_samples_val: 100         # positive validation clips (full run: 5000)
+tts_batch_size: 10         # small — CPU / iGPU shared memory
+augmentation_batch_size: 16
+augmentation_rounds: 1
+
+# ── Paths (resolved by train_wakeword.py) ──
+piper_sample_generator_path: "data/piper-sample-generator"
+output_dir: "output"
+
+rir_paths:
+  - "data/mit_rirs"
+
+background_paths:
+  - "data/audioset_16k"
+  - "data/fma_small"
+
+background_paths_duplication_rate:
+  - 1
+  - 1
+
+# ── Pre-computed feature files ──
+false_positive_validation_data_path: "data/validation_set_features.npy"
+
+feature_data_files:
+  "ACAV100M_sample": "data/openwakeword_features_ACAV100M_2000_hrs_16bit.npy"
+
+# ── Batch composition ──
+batch_n_per_class:
+  "ACAV100M_sample": 1024
+  "adversarial_negative": 50
+  "positive": 50
+
+# ── Model architecture ──
+model_type: "dnn"
+layer_size: 32
+
+# ── Training parameters ── (tiny: smoke only)
+steps: 500                 # full run: 50000
+max_negative_weight: 1500
+target_false_positives_per_hour: 0.2
